@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Flame, Zap, Shield, FileCode, Sliders, Terminal, Cpu, Sparkles, Volume2, VolumeX, Download, Cloud, Radio, Globe, ExternalLink, X } from 'lucide-react';
+import { Flame, Zap, Shield, FileCode, Sliders, Terminal, Cpu, Sparkles, Volume2, VolumeX, Download, Cloud, Radio, Globe, ExternalLink, X, Layers } from 'lucide-react';
 
 interface HeaderProps {
   activeTab: string;
@@ -71,6 +71,7 @@ export const Header: React.FC<HeaderProps> = ({
     },
   ];
   const tabs = [
+    { id: 'suite', label: 'Master Suite Hub', icon: Layers, badge: 'All-in-One' },
     { id: 'desktop', label: 'Windows GUI Form', icon: Cpu, badge: 'ويندوز فورم' },
     { id: 'tastats', label: 'Psyonix TAStatsAPI', icon: Radio, badge: 'Official API' },
     { id: 'cloud', label: 'Google Cloud Hub', icon: Cloud, badge: 'Firestore' },

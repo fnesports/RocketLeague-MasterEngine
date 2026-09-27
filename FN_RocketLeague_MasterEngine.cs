@@ -217,13 +217,23 @@ namespace FNMasterEngine {
             CreateMechanicCard(440, 125, "[D] 45° RIGHT SPEEDFLIP", "Jump -> Double Jump -> Flip Cancel [S] + AirRoll Right [E]", Color.FromArgb(245, 158, 11));
             CreateMechanicCard(650, 125, "[S] FAST AERIAL LAUNCHER", "200ms Jump 1 -> 30ms Pitch Forward [W] -> Stabilize", Color.FromArgb(168, 85, 247));
 
+            // Physics & Deadzone Live Status
+            Label lblPhysics = new Label {
+                Text = "⚡ Continuous Radial Curve Engine: DZ = 0.05 | Steering Mult = 1.50x | Exponent = 1.40 | RLCS LAN Grade Active",
+                Font = new Font("Segoe UI", 8.25f, FontStyle.Bold),
+                ForeColor = Color.FromArgb(251, 191, 36),
+                Location = new Point(22, 226),
+                AutoSize = true
+            };
+            this.Controls.Add(lblPhysics);
+
             // Calibration & Action Bar
             GroupBox grpActions = new GroupBox {
                 Text = " Quick Actions & Engine Injection ",
                 Font = new Font("Segoe UI", 9, FontStyle.Bold),
                 ForeColor = Color.FromArgb(148, 163, 184),
-                Location = new Point(20, 235),
-                Size = new Size(825, 95),
+                Location = new Point(20, 246),
+                Size = new Size(825, 90),
                 BackColor = Color.FromArgb(15, 23, 42)
             };
             this.Controls.Add(grpActions);

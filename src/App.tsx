@@ -9,12 +9,13 @@ import { LatencyLab } from './components/LatencyLab';
 import { AICoachPanel } from './components/AICoachPanel';
 import { CloudSyncHub } from './components/CloudSyncHub';
 import { TAStatsAPIManager } from './components/TAStatsAPIManager';
+import { UnifiedMasterSuite } from './components/UnifiedMasterSuite';
 import { DEFAULT_MACRO_CONFIG, generateLuaScript, RAW_TAINPUT_INI, RAW_POWERSHELL_TEMPLATES } from './data/defaultConfig';
 import { MacroConfig } from './types';
 import { Shield, Flame, Activity, FileCode, CheckCircle, Terminal } from 'lucide-react';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<string>('desktop');
+  const [activeTab, setActiveTab] = useState<string>('suite');
   const [macroConfig, setMacroConfig] = useState<MacroConfig>(DEFAULT_MACRO_CONFIG);
   const [scriptEnabled, setScriptEnabled] = useState<boolean>(true);
   const [activePreset, setActivePreset] = useState<string>('v402');
@@ -105,6 +106,18 @@ export default function App() {
       {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 py-5 space-y-6">
         {/* Active Tab View */}
+        {activeTab === 'suite' && (
+          <UnifiedMasterSuite
+            config={macroConfig}
+            onUpdateConfig={setMacroConfig}
+            onNavigateTab={setActiveTab}
+            scriptEnabled={scriptEnabled}
+            setScriptEnabled={setScriptEnabled}
+            audioDrillActive={audioDrillActive}
+            setAudioDrillActive={setAudioDrillActive}
+          />
+        )}
+
         {activeTab === 'desktop' && (
           <DesktopInstaller />
         )}
