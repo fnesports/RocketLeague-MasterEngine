@@ -1,5 +1,5 @@
 import React from 'react';
-import { Flame, Zap, Shield, FileCode, Sliders, Terminal, Cpu, Sparkles, Volume2, VolumeX, Download, Cloud } from 'lucide-react';
+import { Flame, Zap, Shield, FileCode, Sliders, Terminal, Cpu, Sparkles, Volume2, VolumeX, Download, Cloud, Radio } from 'lucide-react';
 
 interface HeaderProps {
   activeTab: string;
@@ -26,6 +26,7 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   const tabs = [
     { id: 'desktop', label: 'Windows GUI Form', icon: Cpu, badge: 'ويندوز فورم' },
+    { id: 'tastats', label: 'Psyonix TAStatsAPI', icon: Radio, badge: 'Official API' },
     { id: 'cloud', label: 'Google Cloud Hub', icon: Cloud, badge: 'Firestore' },
     { id: 'simulator', label: 'Mechanics Simulator', icon: Flame, badge: '120Hz' },
     { id: 'lua', label: 'Logitech Lua Engine', icon: FileCode, badge: 'G-Hub' },

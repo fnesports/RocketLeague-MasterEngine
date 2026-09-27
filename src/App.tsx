@@ -8,6 +8,7 @@ import { TAInputManager } from './components/TAInputManager';
 import { LatencyLab } from './components/LatencyLab';
 import { AICoachPanel } from './components/AICoachPanel';
 import { CloudSyncHub } from './components/CloudSyncHub';
+import { TAStatsAPIManager } from './components/TAStatsAPIManager';
 import { DEFAULT_MACRO_CONFIG, generateLuaScript, RAW_TAINPUT_INI, RAW_POWERSHELL_TEMPLATES } from './data/defaultConfig';
 import { MacroConfig } from './types';
 import { Shield, Flame, Activity, FileCode, CheckCircle, Terminal } from 'lucide-react';
@@ -106,6 +107,10 @@ export default function App() {
         {/* Active Tab View */}
         {activeTab === 'desktop' && (
           <DesktopInstaller />
+        )}
+
+        {activeTab === 'tastats' && (
+          <TAStatsAPIManager />
         )}
 
         {activeTab === 'cloud' && (
