@@ -1,5 +1,5 @@
-import React from 'react';
-import { Flame, Zap, Shield, FileCode, Sliders, Terminal, Cpu, Sparkles, Volume2, VolumeX, Download, Cloud, Radio } from 'lucide-react';
+import React, { useState } from 'react';
+import { Flame, Zap, Shield, FileCode, Sliders, Terminal, Cpu, Sparkles, Volume2, VolumeX, Download, Cloud, Radio, Globe, ExternalLink, X } from 'lucide-react';
 
 interface HeaderProps {
   activeTab: string;
@@ -24,6 +24,52 @@ export const Header: React.FC<HeaderProps> = ({
   setAudioDrillActive,
   onExportAll,
 }) => {
+  const [portalsModalOpen, setPortalsModalOpen] = useState<boolean>(false);
+
+  const officialLinks = [
+    {
+      title: 'RLCS Official Esports Portal',
+      url: 'https://esports.rocketleague.com',
+      desc: 'Official Rocket League Championship Series standards & LAN rules',
+      badge: 'RLCS LAN',
+      color: 'text-sky-400 border-sky-500/30 bg-sky-950/40',
+    },
+    {
+      title: 'Psyonix Game Data API',
+      url: 'https://www.rocketleague.com',
+      desc: 'MatchStatsExporter_TA 120Hz live JSON match broadcasting engine',
+      badge: 'Unreal Engine 3',
+      color: 'text-emerald-400 border-emerald-500/30 bg-emerald-950/40',
+    },
+    {
+      title: 'Logitech G-HUB Developer Hub',
+      url: 'https://www.logitechg.com/en-us/innovation/g-hub.html',
+      desc: 'Official hardware Lua scripting & driver integration specs',
+      badge: 'Logitech Lua',
+      color: 'text-purple-400 border-purple-500/30 bg-purple-950/40',
+    },
+    {
+      title: 'Microsoft Win32 Low-Level Hooks',
+      url: 'https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setwindowshookexw',
+      desc: 'SetWindowsHookEx (WH_KEYBOARD_LL) microsecond kernel docs',
+      badge: 'Microsoft Learn',
+      color: 'text-amber-400 border-amber-500/30 bg-amber-950/40',
+    },
+    {
+      title: 'Google Cloud Firestore',
+      url: 'https://cloud.google.com/firestore',
+      desc: 'Enterprise multi-region reactive NoSQL database infrastructure',
+      badge: 'Google Cloud',
+      color: 'text-orange-400 border-orange-500/30 bg-orange-950/40',
+    },
+    {
+      title: 'GitHub Official Repository',
+      url: 'https://github.com/userfn-git/RocketLeague-MasterEngine',
+      desc: 'Source code, releases, standalone C# engine & batch compiler',
+      badge: 'Open Source',
+      color: 'text-slate-200 border-slate-700 bg-slate-900',
+    },
+  ];
   const tabs = [
     { id: 'desktop', label: 'Windows GUI Form', icon: Cpu, badge: 'ويندوز فورم' },
     { id: 'tastats', label: 'Psyonix TAStatsAPI', icon: Radio, badge: 'Official API' },
@@ -115,6 +161,16 @@ export const Header: React.FC<HeaderProps> = ({
             <span className="hidden sm:inline">VOICE DRILLS</span>
           </button>
 
+          {/* Official Portals Modal Trigger */}
+          <button
+            onClick={() => setPortalsModalOpen(true)}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-sky-500/10 hover:bg-sky-500/20 border border-sky-500/40 text-sky-300 text-xs font-mono font-bold transition-all shadow-sm"
+            title="Open Official Standards & Portals (RLCS, Psyonix API, Logitech G, Microsoft Win32, Google Cloud, GitHub)"
+          >
+            <Globe className="w-3.5 h-3.5 text-sky-400" />
+            <span className="hidden sm:inline">OFFICIAL PORTALS</span>
+          </button>
+
           {/* Export Bundle */}
           <button
             onClick={onExportAll}
@@ -126,6 +182,72 @@ export const Header: React.FC<HeaderProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Official Authoritative Portals Modal */}
+      {portalsModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-sky-500/30 rounded-2xl p-6 max-w-xl w-full shadow-2xl space-y-4 relative">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-xl bg-sky-500/20 border border-sky-500/40 text-sky-400">
+                  <Globe className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-100 font-['Chakra_Petch'] uppercase tracking-wide">
+                    Official Authoritative Standards & Portals
+                  </h3>
+                  <p className="text-xs text-slate-400 font-['Rajdhani']">
+                    Official documentation hubs, tournament rules, and live APIs
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setPortalsModalOpen(false)}
+                className="text-slate-400 hover:text-slate-200 p-1 rounded-lg hover:bg-slate-800"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-2.5 max-h-[60vh] overflow-y-auto pr-1">
+              {officialLinks.map((link) => (
+                <a
+                  key={link.title}
+                  href={link.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-between p-3 rounded-xl bg-slate-950 hover:bg-slate-850 border border-slate-800 hover:border-sky-500/40 transition-all group"
+                >
+                  <div className="space-y-0.5">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold font-mono text-slate-200 group-hover:text-sky-300 transition-colors">
+                        {link.title}
+                      </span>
+                      <span className={`text-[10px] font-mono px-2 py-0.5 rounded border font-semibold ${link.color}`}>
+                        {link.badge}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-400 font-['Rajdhani']">
+                      {link.desc}
+                    </p>
+                  </div>
+                  <ExternalLink className="w-4 h-4 text-slate-500 group-hover:text-sky-400 shrink-0 ml-3 transition-colors" />
+                </a>
+              ))}
+            </div>
+
+            <div className="pt-2 border-t border-slate-800 flex items-center justify-between text-[11px] font-mono text-slate-400">
+              <span>Author: <strong className="text-slate-200">@userfn-git</strong></span>
+              <button
+                onClick={() => setPortalsModalOpen(false)}
+                className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Navigation Tabs */}
       <div className="max-w-7xl mx-auto px-4 flex items-center gap-1 overflow-x-auto no-scrollbar py-1.5">

@@ -113,7 +113,7 @@ namespace FNMasterEngine {
         public MainForm() {
             // Window Setup
             this.Text = "FN PRO ROCKET LEAGUE MASTER-ENGINE v4.0.2";
-            this.Size = new Size(880, 680);
+            this.Size = new Size(880, 690);
             this.StartPosition = FormStartPosition.CenterScreen;
             this.BackColor = Color.FromArgb(11, 15, 25);
             this.ForeColor = Color.FromArgb(226, 232, 240);
@@ -258,14 +258,14 @@ namespace FNMasterEngine {
                 Text = "REAL-TIME INPUT TELEMETRY & EXECUTION AUDIT (LOG):",
                 Font = new Font("Segoe UI", 8.5f, FontStyle.Bold),
                 ForeColor = Color.FromArgb(148, 163, 184),
-                Location = new Point(20, 345),
+                Location = new Point(20, 342),
                 AutoSize = true
             };
             this.Controls.Add(lblLogTitle);
 
             _logBox = new ListBox {
-                Location = new Point(20, 370),
-                Size = new Size(825, 240),
+                Location = new Point(20, 365),
+                Size = new Size(825, 180),
                 BackColor = Color.FromArgb(6, 9, 16),
                 ForeColor = Color.FromArgb(56, 189, 248),
                 Font = new Font("Consolas", 9.5f),
@@ -273,11 +273,47 @@ namespace FNMasterEngine {
             };
             this.Controls.Add(_logBox);
 
+            // Official Authoritative References & Standards Hub (Live External Portals)
+            GroupBox grpOfficial = new GroupBox {
+                Text = " Official Authoritative Standards & Real-Time Documentation (External Live Portals) ",
+                Font = new Font("Segoe UI", 8.5f, FontStyle.Bold),
+                ForeColor = Color.FromArgb(6, 182, 212),
+                Location = new Point(20, 555),
+                Size = new Size(825, 75),
+                BackColor = Color.FromArgb(15, 23, 42)
+            };
+            this.Controls.Add(grpOfficial);
+
+            Button btnRLCS = CreateActionButton("RLCS Esports", 15, 24, 125, Color.FromArgb(20, 30, 45), Color.FromArgb(56, 189, 248));
+            btnRLCS.Click += (s, e) => OpenUrl("https://esports.rocketleague.com");
+            grpOfficial.Controls.Add(btnRLCS);
+
+            Button btnStatsAPI = CreateActionButton("Psyonix Stats API", 150, 24, 130, Color.FromArgb(20, 30, 45), Color.FromArgb(52, 211, 153));
+            btnStatsAPI.Click += (s, e) => OpenUrl("https://www.rocketleague.com");
+            grpOfficial.Controls.Add(btnStatsAPI);
+
+            Button btnLogitech = CreateActionButton("Logitech G-HUB", 290, 24, 125, Color.FromArgb(20, 30, 45), Color.FromArgb(168, 85, 247));
+            btnLogitech.Click += (s, e) => OpenUrl("https://www.logitechg.com/en-us/innovation/g-hub.html");
+            grpOfficial.Controls.Add(btnLogitech);
+
+            Button btnWin32 = CreateActionButton("Microsoft Win32 API", 425, 24, 135, Color.FromArgb(20, 30, 45), Color.FromArgb(251, 191, 36));
+            btnWin32.Click += (s, e) => OpenUrl("https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setwindowshookexw");
+            grpOfficial.Controls.Add(btnWin32);
+
+            Button btnCloud = CreateActionButton("Google Cloud", 570, 24, 115, Color.FromArgb(20, 30, 45), Color.FromArgb(249, 115, 22));
+            btnCloud.Click += (s, e) => OpenUrl("https://cloud.google.com/firestore");
+            grpOfficial.Controls.Add(btnCloud);
+
+            Button btnGit = CreateActionButton("GitHub Repo", 695, 24, 115, Color.FromArgb(30, 41, 59), Color.White);
+            btnGit.Click += (s, e) => OpenUrl("https://github.com/userfn-git/RocketLeague-MasterEngine");
+            grpOfficial.Controls.Add(btnGit);
+
             // Initial logs
             Log("==================================================================");
             Log("FN PRO ROCKET LEAGUE MASTER-ENGINE v4.0.2 - READY");
             Log("Low-Level Win32 Hook attached directly to Windows Input Kernel.");
             Log("Press [W], [A], [D], [S] in Freeplay or Matches to trigger mechanics.");
+            Log("Official Documentation & Standards Portals available in bottom bar.");
             Log("==================================================================");
 
             // Attach Hook
@@ -380,6 +416,23 @@ namespace FNMasterEngine {
                     Log("[LAUNCHER] Started Rocket League via Epic Games Launcher.");
                 } catch {
                     MessageBox.Show("Please launch Rocket League through your launcher.", "Notice", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+            }
+        }
+
+        private static void OpenUrl(string url) {
+            try {
+                ProcessStartInfo psi = new ProcessStartInfo {
+                    FileName = url,
+                    UseShellExecute = true
+                };
+                Process.Start(psi);
+                Log("[EXTERNAL PORTAL] Opened official portal: " + url);
+            } catch (Exception ex) {
+                try {
+                    Process.Start("explorer.exe", "\"" + url + "\"");
+                } catch {
+                    MessageBox.Show("Could not open link: " + url + "\n" + ex.Message, "Official Link", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }
             }
         }

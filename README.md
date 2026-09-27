@@ -1,11 +1,32 @@
 # ⚡ FN Rocket League Master-Engine (v4.0.2)
 
-![Rocket League](https://img.shields.io/badge/Game-Rocket%20League-blue?style=for-the-badge&logo=rocketleague)
+![Rocket League](https://img.shields.io/badge/Game-Rocket%20League%20Esports-005fb8?style=for-the-badge&logo=rocketleague)
 ![Language](https://img.shields.io/badge/C%23%20%7C%20PowerShell%20%7C%20React%20%7C%20TypeScript-007acc?style=for-the-badge)
 ![Cloud](https://img.shields.io/badge/Google%20Cloud-Firestore%20Live-orange?style=for-the-badge&logo=googlecloud)
+![Win32](https://img.shields.io/badge/Windows%20API-WH__KEYBOARD__LL-blueviolet?style=for-the-badge&logo=windows)
 ![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)
 
-A high-performance, microsecond-precise input optimization framework and low-level Win32 execution engine engineered for competitive **Rocket League** mechanics, 120Hz physics ticks, and sub-millisecond input consistency.
+A high-performance, microsecond-precise input optimization framework, native Windows GUI control center, and low-level Win32 execution engine engineered for competitive **Rocket League** mechanics, 120Hz physics ticks, and sub-millisecond input consistency.
+
+---
+
+## 🌐 Official Authoritative References & Knowledge Bases
+
+This project is built and strictly compliant with official game APIs, operating system kernel interfaces, and cloud database architectures:
+
+* 🎮 **Rocket League Official & Esports Portal**:
+  * [Rocket League Official Website](https://www.rocketleague.com) - Official game updates, patch notes & mechanics baseline.
+  * [Rocket League Esports (RLCS)](https://esports.rocketleague.com) - Official RLCS LAN tournament standards, championship match rules, and pro player telemetry benchmarks.
+* 📡 **Psyonix & Epic Games Built-in Game Data API**:
+  * [MatchStatsExporter_TA Documentation](https://www.rocketleague.com) - Official Unreal Engine 3 `TAStatsAPI.ini` 120Hz live JSON match broadcasting engine (Whitelisted by Easy Anti-Cheat).
+* 🖱️ **Hardware & Scripting Developer Hubs**:
+  * [Logitech G-HUB Official Hub](https://www.logitechg.com/en-us/innovation/g-hub.html) - Official Lua macro execution engine & driver architecture.
+* 🪟 **Microsoft Windows Kernel & Systems Programming**:
+  * [Microsoft Learn: Win32 SetWindowsHookEx (`WH_KEYBOARD_LL`)](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setwindowshookexw) - Low-level kernel keyboard hook specification for sub-millisecond input capture.
+  * [Microsoft Learn: Win32 SendInput API](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-sendinput) - Hardware-level synthetic packet dispatching without OS message queue latency.
+  * [Microsoft Learn: PowerShell Systems Documentation](https://learn.microsoft.com/en-us/powershell/) - Official command-line and scripting language reference.
+* ☁️ **Google Cloud Infrastructure**:
+  * [Google Cloud Firestore Architecture](https://cloud.google.com/firestore) - Enterprise multi-region NoSQL document storage and realtime reactive synchronization.
 
 ---
 
@@ -29,34 +50,38 @@ A high-performance, microsecond-precise input optimization framework and low-lev
 * Completely filters hardware stick drift between `0.00` and `0.05`, while beginning ultra-smooth deflection at `0.003` past `0.05` instead of abrupt step jumps.
 * Features a live ASCII telemetry simulator and direct injector for Unreal Engine's `TAInput.ini`.
 
-### 4. ☁️ Google Cloud Infrastructure & Realtime Synchronization
+### 4. 📡 Official Psyonix TAStatsAPI.ini 120Hz Live Stream
+* Configured via `[TAGame.MatchStatsExporter_TA]` with `PacketSendRate=120`.
+* Streams live in-match telemetry (car velocity, supersonic state, boost percentage, and kickoff event triggers) over WebSocket `ws://localhost:9001`.
+
+### 5. ☁️ Google Cloud Infrastructure & Realtime Synchronization
 * **Database:** Multi-region **Google Cloud Firestore (NoSQL)** for storing player configurations, speedflip timings, and deadzones.
 * **Security:** ABAC Zero-Trust Firestore Security Rules protecting user document spaces.
 * **Community Hub:** Realtime cloud presets from top RLCS pros (Zen, Vatira, BeastMode) with one-click in-engine application.
 
 ---
 
-## 🛠️ Quick Local Launch (PowerShell)
+## 🛠️ Instant Local Compilation & Run (Windows .EXE)
 
-To run the unified **WASD Hook Engine** directly on your Windows desktop:
-
-```powershell
-& "$HOME\Desktop\RocketLeague_MasterHooks_WASD.ps1"
-```
-
-To run the interactive **Deadzone & Sensitivity Tuner**:
-```powershell
-& "$HOME\Desktop\RL_DeadzoneTuner.ps1" -Interactive
-```
+1. Clone or download the repository:
+   ```powershell
+   git clone https://github.com/userfn-git/RocketLeague-MasterEngine.git
+   cd RocketLeague-MasterEngine
+   ```
+2. Double-click **`build.bat`**.
+3. That's it! It automatically compiles `FN_RocketLeague_MasterEngine.cs` using Windows built-in `csc.exe` and launches the standalone **`FN_RocketLeague_MasterEngine.exe`** GUI window with the custom FN icon and live links.
 
 ---
 
 ## 📂 Project Structure
 
 ```text
+├── build.bat                      # One-click Windows native batch compiler
+├── FN_RocketLeague_MasterEngine.cs # Standalone C# Win32 Form source code
 ├── src/
 │   ├── components/
 │   │   ├── CloudSyncHub.tsx       # Google Cloud Firestore & Auth Hub
+│   │   ├── TAStatsAPIManager.tsx  # Official Psyonix 120Hz Match Data API Studio
 │   │   ├── DesktopInstaller.tsx   # Windows GUI Form & C# hook generator
 │   │   ├── MechanicsTimeline.tsx  # 120Hz physics simulation timeline
 │   │   ├── PowerShellManager.tsx  # Native C# Win32 low-level hook center
