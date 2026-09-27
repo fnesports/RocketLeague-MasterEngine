@@ -18,9 +18,21 @@ import {
   Radio,
   Server,
   AlertCircle,
+  TrendingDown,
+  Navigation,
+  Crosshair,
 } from 'lucide-react';
+import { InferredSpatialEvent, OpponentStarvationState } from '../types';
 
-export const TAStatsAPIManager: React.FC = () => {
+interface TAStatsAPIManagerProps {
+  onOpponentStarveChange?: (state: OpponentStarvationState) => void;
+  onSpatialEventInferred?: (event: InferredSpatialEvent) => void;
+}
+
+export const TAStatsAPIManager: React.FC<TAStatsAPIManagerProps> = ({
+  onOpponentStarveChange,
+  onSpatialEventInferred,
+}) => {
   const [packetSendRate, setPacketSendRate] = useState<number>(120);
   const [tcpPort, setTcpPort] = useState<number>(9000);
   const [webSocketPort, setWebSocketPort] = useState<number>(9001);
@@ -35,11 +47,31 @@ export const TAStatsAPIManager: React.FC = () => {
   const [isSupersonic, setIsSupersonic] = useState<boolean>(false);
   const [kickoffTimerMs, setKickoffTimerMs] = useState<number>(0);
   const [kickoffStatus, setKickoffStatus] = useState<'IDLE' | 'KICKOFF_STARTED' | 'SPEEDFLIP_EXECUTED' | 'SUPERSONIC_REACHED'>('IDLE');
+  
+  // Opponent Starvation & Spatial Mechanics State
+  const [opponentBoost, setOpponentBoost] = useState<number>(100);
+  const [isOpponentStarved, setIsOpponentStarved] = useState<boolean>(false);
+  const [starvationSeconds, setStarvationSeconds] = useState<number>(0);
+  const [recentSpatialEvents, setRecentSpatialEvents] = useState<InferredSpatialEvent[]>([]);
+
   const [eventsLog, setEventsLog] = useState<Array<{ id: string; time: string; event: string; detail: string }>>([
     { id: '1', time: '00:00.00', event: 'INIT', detail: 'Psyonix MatchStatsExporter_TA ready on port 9001' },
   ]);
 
   const socketRef = useRef<WebSocket | null>(null);
+
+  // Anti-Jitter Refs: Track high-frequency (120Hz) variables without triggering 120 re-renders/sec
+  const opponentTrackerRef = useRef<{
+    boost: number;
+    zeroBoostTimestamp: number | null;
+    isStarved: boolean;
+    lastStateEmissionSec: number;
+  }>({
+    boost: 100,
+    zeroBoostTimestamp: null,
+    isStarved: false,
+    lastStateEmissionSec: 0,
+  });
 
   // Raw TAStatsAPI.ini contents
   const rawStatsIni = `[TAGame.MatchStatsExporter_TA]
@@ -137,10 +169,116 @@ Write-Host ">>> MatchStatsExporter_TA Active! Restart Rocket League to broadcast
     setEventsLog((prev) => [{ id: Math.random().toString(), time: timeStr, event, detail }, ...prev.slice(0, 15)]);
   };
 
+  // Spatial Mechanics Inference Functions
+  const inferMechanicFromBallHit = (
+    location: { x: number; y: number; z: number },
+    postHitSpeed: number
+  ): InferredSpatialEvent[] => {
+    const events: InferredSpatialEvent[] = [];
+    const timeStr = new Date().toISOString().substring(14, 22);
+
+    // 1. Aerial: Z higher than aerial flight altitude (Z >= 800 uu)
+    if (location.z >= 800) {
+      events.push({
+        id: Math.random().toString(),
+        type: 'AERIAL',
+        title: 'Aerial Strike',
+        timestamp: timeStr,
+        location,
+        postHitSpeed,
+        description: `High altitude aerial ball contact at Z: ${Math.round(location.z)} uu`,
+      });
+    }
+
+    // 2. Wall Hit: Near arena boundaries (|X| >= 3500 or |Y| >= 4500) and elevated (Z >= 250 uu)
+    if ((Math.abs(location.x) >= 3500 || Math.abs(location.y) >= 4500) && location.z >= 250) {
+      events.push({
+        id: Math.random().toString(),
+        type: 'WALL_HIT',
+        title: 'Wall Pinch / Shot',
+        timestamp: timeStr,
+        location,
+        postHitSpeed,
+        description: `Perimeter wall hit at (${Math.round(location.x)}, ${Math.round(location.y)}, ${Math.round(location.z)})`,
+      });
+    }
+
+    // 3. Power Shot: Post-hit ball speed exceeding 1000 uu/s (~100 km/h)
+    if (postHitSpeed >= 1000) {
+      events.push({
+        id: Math.random().toString(),
+        type: 'POWER_SHOT',
+        title: 'Power Shot Blast',
+        timestamp: timeStr,
+        location,
+        postHitSpeed,
+        description: `High-velocity discharge: ${Math.round(postHitSpeed)} uu/s (~${Math.round((postHitSpeed * 36) / 1000)} km/h)`,
+      });
+    }
+
+    return events;
+  };
+
+  // High-Performance Boost Starvation Evaluator (Anti-Jitter Throttling)
+  const evaluateOpponentBoost = (oppBoost: number, eventName?: string) => {
+    const tracker = opponentTrackerRef.current;
+    const now = performance.now();
+
+    // Reset when boost pickup occurs or boost recovered
+    if (eventName === 'Event_BoostPickup' || oppBoost > 0) {
+      tracker.boost = oppBoost;
+      tracker.zeroBoostTimestamp = null;
+      if (tracker.isStarved) {
+        tracker.isStarved = false;
+        tracker.lastStateEmissionSec = 0;
+        setIsOpponentStarved(false);
+        setStarvationSeconds(0);
+        onOpponentStarveChange?.({
+          isStarved: false,
+          starvationDurationSec: 0,
+          opponentBoost: oppBoost,
+          lastUpdated: now,
+        });
+        addLog('BOOST_RECOVERED', `Opponent collected boost: ${oppBoost}%`);
+      }
+      return;
+    }
+
+    // Zero Boost evaluation
+    if (oppBoost === 0) {
+      tracker.boost = 0;
+      if (tracker.zeroBoostTimestamp === null) {
+        tracker.zeroBoostTimestamp = now;
+      } else {
+        const elapsedSec = Math.floor((now - tracker.zeroBoostTimestamp) / 1000);
+        if (elapsedSec >= 5) {
+          if (!tracker.isStarved) {
+            tracker.isStarved = true;
+            setIsOpponentStarved(true);
+            addLog('PRESSURE_ALERT', `⚡ OPPONENT STARVED (0% boost for 5s+) - PUSH ADVANTAGE!`);
+          }
+          // Throttle updates: only re-render once per full elapsed second
+          if (elapsedSec !== tracker.lastStateEmissionSec) {
+            tracker.lastStateEmissionSec = elapsedSec;
+            setStarvationSeconds(elapsedSec);
+            onOpponentStarveChange?.({
+              isStarved: true,
+              starvationDurationSec: elapsedSec,
+              opponentBoost: 0,
+              lastUpdated: now,
+            });
+          }
+        }
+      }
+    }
+  };
+
   const handleLivePacket = (packet: any) => {
     if (packet?.event === 'Event_Kickoff') {
       triggerKickoff();
     }
+
+    // 1. Player Telemetry & Opponent Boost Extraction
     if (packet?.players && packet.players.length > 0) {
       const player = packet.players[0];
       if (player.speed !== undefined) {
@@ -151,7 +289,71 @@ Write-Host ">>> MatchStatsExporter_TA Active! Restart Rocket League to broadcast
       if (player.boost !== undefined) {
         setBoostAmount(Math.round(player.boost));
       }
+
+      // Opponent extraction (1v1 opposite team or second player slot)
+      const opp = packet.players.find((p: any) => p.is_opponent || p.team === 1) || packet.players[1];
+      if (opp && opp.boost !== undefined) {
+        const oBoost = Math.round(opp.boost);
+        setOpponentBoost(oBoost);
+        evaluateOpponentBoost(oBoost, packet?.event);
+      }
     }
+
+    // 2. BallHit Event: Spatial Mechanics Inference
+    if (packet?.event === 'Event_BallHit' || packet?.ball_hit) {
+      const loc = packet.ball?.location || packet.location || { x: 0, y: 0, z: 0 };
+      const spd = packet.ball?.speed || packet.post_hit_speed || packet.speed || 0;
+      const inferredEvents = inferMechanicFromBallHit(loc, spd);
+
+      if (inferredEvents.length > 0) {
+        inferredEvents.forEach((evt) => {
+          onSpatialEventInferred?.(evt);
+          addLog(evt.type, `${evt.title} at (${Math.round(loc.x)}, ${Math.round(loc.y)}, ${Math.round(loc.z)})`);
+        });
+        setRecentSpatialEvents((prev) => [...inferredEvents, ...prev].slice(0, 10));
+      }
+    }
+
+    // 3. BoostPickup Event Check
+    if (packet?.event === 'Event_BoostPickup') {
+      evaluateOpponentBoost(100, 'Event_BoostPickup');
+    }
+  };
+
+  // Simulation Triggers for Live Testing without active match
+  const simulateOpponentStarvation = () => {
+    setOpponentBoost(0);
+    const tracker = opponentTrackerRef.current;
+    tracker.boost = 0;
+    tracker.zeroBoostTimestamp = performance.now() - 5200; // Fake 5.2 seconds elapsed
+    evaluateOpponentBoost(0);
+    addLog('SIM_STARVE', 'Simulated 0% Opponent Boost for 5.2 seconds.');
+  };
+
+  const simulateRecoverBoost = () => {
+    setOpponentBoost(100);
+    evaluateOpponentBoost(100, 'Event_BoostPickup');
+    addLog('SIM_RECOVERY', 'Simulated Opponent BoostPickup (100%).');
+  };
+
+  const simulateSpatialHit = (type: 'AERIAL' | 'WALL_HIT' | 'POWER_SHOT') => {
+    let loc = { x: 0, y: 0, z: 1200 };
+    let spd = 650;
+
+    if (type === 'WALL_HIT') {
+      loc = { x: 3880, y: -2100, z: 650 };
+      spd = 850;
+    } else if (type === 'POWER_SHOT') {
+      loc = { x: 200, y: 1500, z: 120 };
+      spd = 1450;
+    }
+
+    const inferred = inferMechanicFromBallHit(loc, spd);
+    inferred.forEach((evt) => {
+      onSpatialEventInferred?.(evt);
+      addLog(evt.type, `[SIM] ${evt.title}: ${evt.description}`);
+    });
+    setRecentSpatialEvents((prev) => [...inferred, ...prev].slice(0, 10));
   };
 
   // 120Hz Kickoff Simulation Runner
@@ -381,6 +583,147 @@ Write-Host ">>> MatchStatsExporter_TA Active! Restart Rocket League to broadcast
           </div>
           <div className="text-center text-[10px] font-mono bg-slate-950 py-1 rounded border border-slate-800 text-emerald-400">
             RLCS LAN Target: &lt; 900 ms
+          </div>
+        </div>
+      </div>
+
+      {/* Feature 1 & 2: Coach HUD Opponent Boost Starvation & Spatial Mechanics Radar */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Opponent Boost & Starvation Pressure Tracker */}
+        <div className={`border rounded-2xl p-4 transition-all ${
+          isOpponentStarved
+            ? 'bg-rose-950/40 border-rose-500/60 shadow-lg shadow-rose-950/50'
+            : 'bg-slate-900 border-slate-800'
+        }`}>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <TrendingDown className={`w-4 h-4 ${isOpponentStarved ? 'text-rose-400 animate-pulse' : 'text-slate-400'}`} />
+              <span className="text-xs font-mono text-slate-300 font-bold uppercase">
+                Coach HUD: Opponent Boost Tracker
+              </span>
+            </div>
+            {isOpponentStarved ? (
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/50 font-bold animate-pulse">
+                الخصم بدون بوست ({starvationSeconds}s)
+              </span>
+            ) : (
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700">
+                Opponent Tracking Active
+              </span>
+            )}
+          </div>
+
+          <div className="my-3 flex items-center justify-between">
+            <div>
+              <div className="text-3xl font-extrabold font-['Chakra_Petch'] text-slate-100">
+                {opponentBoost} <span className="text-base text-slate-500 font-normal">%</span>
+              </div>
+              <p className="text-[11px] font-mono text-slate-400 mt-0.5">
+                {isOpponentStarved
+                  ? '⚠️ Opponent starved for >= 5s! Push challenge advantage now.'
+                  : 'Starvation triggers when opponent stays at 0% boost for 5 continuous seconds.'}
+              </p>
+            </div>
+            <div className="flex flex-col gap-1.5 shrink-0">
+              <button
+                onClick={simulateOpponentStarvation}
+                className="px-2.5 py-1 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/40 text-[10px] font-mono font-bold transition-all"
+              >
+                TEST STARVE (5s)
+              </button>
+              <button
+                onClick={simulateRecoverBoost}
+                className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-[10px] font-mono transition-all"
+              >
+                RESET (100%)
+              </button>
+            </div>
+          </div>
+
+          <div className="w-full bg-slate-950 rounded-full h-2 overflow-hidden border border-slate-800">
+            <div
+              className={`h-full transition-all duration-150 ${
+                isOpponentStarved
+                  ? 'bg-rose-500'
+                  : opponentBoost > 33
+                  ? 'bg-emerald-500'
+                  : 'bg-amber-500'
+              }`}
+              style={{ width: `${opponentBoost}%` }}
+            />
+          </div>
+        </div>
+
+        {/* Spatial Mechanics Radar (BallHit Inferences) */}
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-col justify-between">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Crosshair className="w-4 h-4 text-sky-400" />
+              <span className="text-xs font-mono text-slate-300 font-bold uppercase">
+                Spatial Mechanics Radar (BallHit Inferences)
+              </span>
+            </div>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => simulateSpatialHit('AERIAL')}
+                className="px-2 py-0.5 rounded bg-sky-500/20 text-sky-300 border border-sky-500/40 text-[10px] font-mono hover:bg-sky-500/30"
+                title="Test Aerial Hit"
+              >
+                + Aerial
+              </button>
+              <button
+                onClick={() => simulateSpatialHit('WALL_HIT')}
+                className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] font-mono hover:bg-amber-500/30"
+                title="Test Wall Hit"
+              >
+                + Wall Hit
+              </button>
+              <button
+                onClick={() => simulateSpatialHit('POWER_SHOT')}
+                className="px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/40 text-[10px] font-mono hover:bg-purple-500/30"
+                title="Test Power Shot"
+              >
+                + Power Shot
+              </button>
+            </div>
+          </div>
+
+          <div className="my-2 space-y-1.5 max-h-24 overflow-y-auto pr-1">
+            {recentSpatialEvents.length === 0 ? (
+              <div className="text-[11px] font-mono text-slate-500 py-3 text-center">
+                Awaiting BallHit events from Psyonix Stats API...
+              </div>
+            ) : (
+              recentSpatialEvents.slice(0, 3).map((evt) => (
+                <div
+                  key={evt.id}
+                  className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-[11px] font-mono"
+                >
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${
+                        evt.type === 'AERIAL'
+                          ? 'bg-sky-950 text-sky-300 border border-sky-500/50'
+                          : evt.type === 'WALL_HIT'
+                          ? 'bg-amber-950 text-amber-300 border border-amber-500/50'
+                          : 'bg-purple-950 text-purple-300 border border-purple-500/50'
+                      }`}
+                    >
+                      {evt.type}
+                    </span>
+                    <span className="text-slate-300">{evt.title}</span>
+                  </div>
+                  <span className="text-slate-500 text-[10px]">
+                    Z: {Math.round(evt.location.z)} | Spd: {Math.round(evt.postHitSpeed)}
+                  </span>
+                </div>
+              ))
+            )}
+          </div>
+
+          <div className="text-[10px] font-mono text-slate-400 bg-slate-950 px-2.5 py-1 rounded border border-slate-800 flex items-center justify-between">
+            <span>Inference: Aerial (Z&gt;800) • Wall (|X|&gt;3500) • Power (&gt;1000)</span>
+            <span className="text-emerald-400 font-bold">Auto-synced to Timeline</span>
           </div>
         </div>
       </div>

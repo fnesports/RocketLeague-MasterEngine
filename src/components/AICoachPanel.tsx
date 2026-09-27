@@ -4,9 +4,15 @@ import { CoachMessage, MacroConfig } from '../types';
 
 interface AICoachPanelProps {
   config: MacroConfig;
+  opponentStarved?: boolean;
+  starvationDurationSec?: number;
 }
 
-export const AICoachPanel: React.FC<AICoachPanelProps> = ({ config }) => {
+export const AICoachPanel: React.FC<AICoachPanelProps> = ({
+  config,
+  opponentStarved = false,
+  starvationDurationSec = 0,
+}) => {
   const [messages, setMessages] = useState<CoachMessage[]>([
     {
       id: 'welcome',
@@ -195,6 +201,44 @@ export const AICoachPanel: React.FC<AICoachPanelProps> = ({ config }) => {
           </button>
         </div>
       </div>
+
+      {/* Feature 1: Coach HUD Opponent Boost Starvation Live Alert */}
+      {opponentStarved ? (
+        <div className="bg-rose-950/70 border border-rose-500/60 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-lg shadow-rose-950/50 animate-pulse">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-xl bg-rose-500/20 border border-rose-500/50 text-rose-400">
+              <AlertCircle className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-bold font-mono text-rose-100">
+                  🚨 تنبيه المدرب: الخصم بدون بوست (0% Boost)
+                </span>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-rose-500/30 text-rose-300 border border-rose-500/60 font-black">
+                  فترة الجفاف: {starvationDurationSec}s
+                </span>
+              </div>
+              <p className="text-xs text-rose-200/80 font-['Rajdhani'] mt-0.5">
+                الخصم تحت ضغط شديد وعاجز عن صد الكرات الهوائية العالية! احرمه من الـ Big Boost Pads وافرض الحصار الهجومي فوراً.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => handleSendMessage('الخصم حالياً بدون بوست منذ 5 ثوانٍ، ما هو أفضل تكتيك هجومي لاستغلال هذا الضغط؟')}
+            className="px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-mono font-bold transition-all shrink-0 shadow"
+          >
+            اسأل المدرب عن التكتيك
+          </button>
+        </div>
+      ) : (
+        <div className="bg-slate-900/60 border border-slate-800/80 rounded-xl px-4 py-2 flex items-center justify-between text-xs font-mono text-slate-400">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-emerald-400" />
+            <span>Spectator Telemetry: Opponent Boost Tracker Monitoring (Starvation Alert at 5s zero boost)</span>
+          </div>
+          <span className="text-[10px] text-slate-500">Psyonix Stats API Active</span>
+        </div>
+      )}
 
       {/* Main Chat Interface */}
       <div className="bg-slate-900/90 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl flex flex-col h-[560px]">

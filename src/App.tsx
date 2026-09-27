@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { Header } from './components/Header';
 import { DesktopInstaller } from './components/DesktopInstaller';
 import { MechanicsTimeline } from './components/MechanicsTimeline';
@@ -11,7 +11,7 @@ import { CloudSyncHub } from './components/CloudSyncHub';
 import { TAStatsAPIManager } from './components/TAStatsAPIManager';
 import { UnifiedMasterSuite } from './components/UnifiedMasterSuite';
 import { DEFAULT_MACRO_CONFIG, generateLuaScript, RAW_TAINPUT_INI, RAW_POWERSHELL_TEMPLATES } from './data/defaultConfig';
-import { MacroConfig } from './types';
+import { MacroConfig, InferredSpatialEvent, OpponentStarvationState } from './types';
 import { Shield, Flame, Activity, FileCode, CheckCircle, Terminal } from 'lucide-react';
 
 export default function App() {
@@ -20,6 +20,23 @@ export default function App() {
   const [scriptEnabled, setScriptEnabled] = useState<boolean>(true);
   const [activePreset, setActivePreset] = useState<string>('v402');
   const [audioDrillActive, setAudioDrillActive] = useState<boolean>(false);
+
+  // Live Stats API Telemetry Bridge (Anti-Jitter Shared States)
+  const [opponentStarvedState, setOpponentStarvedState] = useState<OpponentStarvationState>({
+    isStarved: false,
+    starvationDurationSec: 0,
+    opponentBoost: 100,
+    lastUpdated: 0,
+  });
+  const [inferredSpatialEvents, setInferredSpatialEvents] = useState<InferredSpatialEvent[]>([]);
+
+  const handleOpponentStarveChange = useCallback((state: OpponentStarvationState) => {
+    setOpponentStarvedState(state);
+  }, []);
+
+  const handleSpatialEventInferred = useCallback((event: InferredSpatialEvent) => {
+    setInferredSpatialEvents((prev) => [event, ...prev.slice(0, 19)]);
+  }, []);
 
   // Preset switching logic
   const handleSelectPreset = (presetKey: string) => {
@@ -123,7 +140,10 @@ export default function App() {
         )}
 
         {activeTab === 'tastats' && (
-          <TAStatsAPIManager />
+          <TAStatsAPIManager
+            onOpponentStarveChange={handleOpponentStarveChange}
+            onSpatialEventInferred={handleSpatialEventInferred}
+          />
         )}
 
         {activeTab === 'cloud' && (
@@ -147,6 +167,7 @@ export default function App() {
             config={macroConfig}
             onUpdateConfig={setMacroConfig}
             audioDrillActive={audioDrillActive}
+            liveSpatialEvents={inferredSpatialEvents}
           />
         )}
 
@@ -175,6 +196,8 @@ export default function App() {
         {activeTab === 'coach' && (
           <AICoachPanel
             config={macroConfig}
+            opponentStarved={opponentStarvedState.isStarved}
+            starvationDurationSec={opponentStarvedState.starvationDurationSec}
           />
         )}
       </main>

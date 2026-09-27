@@ -1,18 +1,20 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Play, Pause, RotateCcw, FastForward, Clock, ShieldAlert, CheckCircle2, Sliders, Volume2, Sparkles, AlertTriangle } from 'lucide-react';
+import { Play, Pause, RotateCcw, FastForward, Clock, ShieldAlert, CheckCircle2, Sliders, Volume2, Sparkles, AlertTriangle, Crosshair, Radio } from 'lucide-react';
 import { MECHANICS_CATALOG } from '../data/defaultConfig';
-import { MechanicDefinition, MechanicStep, MacroConfig } from '../types';
+import { MechanicDefinition, MechanicStep, MacroConfig, InferredSpatialEvent } from '../types';
 
 interface MechanicsTimelineProps {
   config: MacroConfig;
   onUpdateConfig: (newConfig: MacroConfig) => void;
   audioDrillActive: boolean;
+  liveSpatialEvents?: InferredSpatialEvent[];
 }
 
 export const MechanicsTimeline: React.FC<MechanicsTimelineProps> = ({
   config,
   onUpdateConfig,
   audioDrillActive,
+  liveSpatialEvents = [],
 }) => {
   const [selectedMechanicId, setSelectedMechanicId] = useState<string>('speedflip-left');
   const [currentTimeMs, setCurrentTimeMs] = useState<number>(0);
@@ -575,6 +577,60 @@ export const MechanicsTimeline: React.FC<MechanicsTimelineProps> = ({
                 </div>
               );
             })}
+          </div>
+
+          {/* Feature 2: Spatial Mechanics Inferred Events Stream (From Psyonix Stats API) */}
+          <div className="bg-slate-900/90 border border-sky-500/30 rounded-xl p-3.5 space-y-2.5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Crosshair className="w-4 h-4 text-sky-400" />
+                <h4 className="font-['Chakra_Petch'] font-bold text-xs uppercase text-slate-200">
+                  Spatial Mechanics Event Timeline (Live BallHit Stream)
+                </h4>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-sky-950 text-sky-300 border border-sky-500/40">
+                  Psyonix 120Hz Inferred
+                </span>
+              </div>
+              <span className="text-[11px] font-mono text-slate-400">
+                {liveSpatialEvents.length} Inferred Events Detected
+              </span>
+            </div>
+
+            {liveSpatialEvents.length === 0 ? (
+              <div className="text-[11px] font-mono text-slate-500 py-2 text-center bg-slate-950/60 rounded-lg border border-slate-800">
+                Awaiting BallHit telemetry from TAStatsAPI.ini (Aerials: Z&gt;800 | Wall Hits: |X|&gt;3500 | Power: Spd&gt;1000)
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                {liveSpatialEvents.slice(0, 3).map((evt) => (
+                  <div
+                    key={evt.id}
+                    className="p-2.5 rounded-lg bg-slate-950 border border-slate-800 flex flex-col justify-between"
+                  >
+                    <div className="flex items-center justify-between text-[10px] font-mono">
+                      <span
+                        className={`px-1.5 py-0.5 rounded font-bold ${
+                          evt.type === 'AERIAL'
+                            ? 'bg-sky-950 text-sky-300 border border-sky-500/50'
+                            : evt.type === 'WALL_HIT'
+                            ? 'bg-amber-950 text-amber-300 border border-amber-500/50'
+                            : 'bg-purple-950 text-purple-300 border border-purple-500/50'
+                        }`}
+                      >
+                        {evt.type}
+                      </span>
+                      <span className="text-slate-500">[{evt.timestamp}]</span>
+                    </div>
+                    <div className="text-xs font-bold text-slate-200 mt-1 line-clamp-1">
+                      {evt.title}
+                    </div>
+                    <div className="text-[10px] font-mono text-slate-400 mt-1">
+                      XYZ: ({Math.round(evt.location.x)}, {Math.round(evt.location.y)}, {Math.round(evt.location.z)}) | Spd: {Math.round(evt.postHitSpeed)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Macro Delay Adjuster Knobs */}

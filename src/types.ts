@@ -75,3 +75,20 @@ export interface CoachMessage {
   model?: string;
   isAudioPlaying?: boolean;
 }
+
+export interface InferredSpatialEvent {
+  id: string;
+  type: 'AERIAL' | 'WALL_HIT' | 'POWER_SHOT';
+  title: string;
+  timestamp: string;
+  location: { x: number; y: number; z: number };
+  postHitSpeed: number;
+  description: string;
+}
+
+export interface OpponentStarvationState {
+  isStarved: boolean;
+  starvationDurationSec: number;
+  opponentBoost: number;
+  lastUpdated: number;
+}
