@@ -1,78 +1,3 @@
-# ==============================================================================
-# FN PRO ROCKET LEAGUE MASTER-ENGINE - STANDALONE GUI .EXE COMPILER
-# Compiles a complete Windows GUI Form with embedded "FN" Icon into:
-# FN_RocketLeague_MasterEngine.exe
-# ==============================================================================
-
-param(
-    [string]$OutputPath = "$HOME\Desktop\FN_RocketLeague_MasterEngine.exe"
-)
-
-Clear-Host
-Write-Host "==========================================================" -ForegroundColor Cyan
-Write-Host "   FN PRO ROCKET LEAGUE MASTER-ENGINE - GUI EXE COMPILER  " -ForegroundColor Green
-Write-Host "==========================================================" -ForegroundColor Cyan
-
-# Step 1: Generate High-Resolution "FN" Cyberpunk Icon (.ico)
-Add-Type -AssemblyName System.Drawing
-
-$iconPath = "$env:TEMP\FN_MasterEngine_Icon.ico"
-$bmp = New-Object System.Drawing.Bitmap 128, 128
-$g = [System.Drawing.Graphics]::FromImage($bmp)
-$g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
-$g.TextRenderingHint = [System.Drawing.Text.TextRenderingHint]::AntiAlias
-
-# Background dark rounded rect
-$brushBg = New-Object System.Drawing.SolidBrush ([System.Drawing.Color]::FromArgb(11, 15, 25))
-$penBorder = New-Object System.Drawing.Pen ([System.Drawing.Color]::FromArgb(6, 182, 212), 4)
-$rect = New-Object System.Drawing.Rectangle 4, 4, 120, 120
-$g.FillEllipse($brushBg, $rect)
-$g.DrawEllipse($penBorder, $rect)
-
-# Draw "FN" Letters
-$font = New-Object System.Drawing.Font("Arial", 46, [System.Drawing.FontStyle]::Bold)
-$brushText = New-Object System.Drawing.SolidBrush ([System.Drawing.Color]::FromArgb(6, 182, 212))
-$sf = New-Object System.Drawing.StringFormat
-$sf.Alignment = [System.Drawing.StringAlignment]::Center
-$sf.LineAlignment = [System.Drawing.StringAlignment]::Center
-$g.DrawString("FN", $font, $brushText, (New-Object System.Drawing.RectangleF 0, 0, 128, 128), $sf)
-
-# Status dot
-$brushDot = New-Object System.Drawing.SolidBrush ([System.Drawing.Color]::FromArgb(16, 185, 129))
-$g.FillEllipse($brushDot, (New-Object System.Drawing.Rectangle 88, 88, 20, 20))
-
-$hIcon = $bmp.GetHicon()
-$iconObj = [System.Drawing.Icon]::FromHandle($hIcon)
-$fileStream = New-Object System.IO.FileStream $iconPath, ([System.IO.FileMode]::Create)
-$iconObj.Save($fileStream)
-$fileStream.Close()
-$g.Dispose()
-$bmp.Dispose()
-
-Write-Host "[OK] Generated custom high-res 'FN' icon at: $iconPath" -ForegroundColor Green
-
-# Step 2: Locate Windows C# Compiler (csc.exe)
-$cscCandidates = @(
-    "$env:SystemRoot\Microsoft.NET\Framework64\v4.0.30319\csc.exe",
-    "$env:SystemRoot\Microsoft.NET\Framework\v4.0.30319\csc.exe"
-)
-
-$cscPath = $null
-foreach ($path in $cscCandidates) {
-    if (Test-Path $path) {
-        $cscPath = $path
-        break
-    }
-}
-
-if (-not $cscPath) {
-    Write-Host "[ERROR] Could not find csc.exe in standard .NET paths." -ForegroundColor Red
-    Exit
-}
-Write-Host "[OK] Using Windows C# Compiler: $cscPath" -ForegroundColor Green
-
-# Step 3: Standalone C# Source Code with Full Visual GUI Window (Form)
-$csharpSource = @'
 using System;
 using System.Diagnostics;
 using System.Drawing;
@@ -95,12 +20,6 @@ namespace FNMasterEngine {
         private static ListBox _logBox;
         private static Label _statusLabel;
         private static Button _btnToggle;
-        private static NotifyIcon _trayIcon;
-
-        // Custom config values
-        private static double _internalDeadzone = 0.05;
-        private static double _dodgeDeadzone = 0.05;
-        private static double _curveExponent = 1.40;
 
         [StructLayout(LayoutKind.Sequential)]
         private struct KBDLLHOOKSTRUCT {
@@ -201,18 +120,20 @@ namespace FNMasterEngine {
             this.FormBorderStyle = FormBorderStyle.FixedSingle;
             this.MaximizeBox = false;
 
-            // Generate runtime Form Icon
-            Bitmap b = new Bitmap(32, 32);
-            using (Graphics g = Graphics.FromImage(b)) {
-                g.Clear(Color.FromArgb(11, 15, 25));
-                using (Pen p = new Pen(Color.FromArgb(6, 182, 212), 2)) {
-                    g.DrawRectangle(p, 2, 2, 28, 28);
+            // Generate runtime Form Icon with "FN" Logo
+            try {
+                Bitmap bmp = new Bitmap(64, 64);
+                using (Graphics g = Graphics.FromImage(bmp)) {
+                    g.Clear(Color.FromArgb(11, 15, 25));
+                    using (Pen p = new Pen(Color.FromArgb(6, 182, 212), 3)) {
+                        g.DrawEllipse(p, 4, 4, 56, 56);
+                    }
+                    using (Font f = new Font("Arial", 22, FontStyle.Bold)) {
+                        g.DrawString("FN", f, new SolidBrush(Color.FromArgb(6, 182, 212)), 8, 14);
+                    }
                 }
-                using (Font f = new Font("Arial", 11, FontStyle.Bold)) {
-                    g.DrawString("FN", f, new SolidBrush(Color.FromArgb(6, 182, 212)), 2, 6);
-                }
-            }
-            this.Icon = Icon.FromHandle(b.GetHicon());
+                this.Icon = Icon.FromHandle(bmp.GetHicon());
+            } catch {}
 
             // Header Banner
             Panel pnlHeader = new Panel {
@@ -634,38 +555,4 @@ namespace FNMasterEngine {
             return CallNextHookEx(_hookID, nCode, wParam, lParam);
         }
     }
-}
-'@
-
-$tempCsPath = "$env:TEMP\FN_MasterEngine_Form_Source.cs"
-Set-Content -Path $tempCsPath -Value $csharpSource -Encoding UTF8
-
-Write-Host "[+] Compiling Standalone GUI Windows Form .EXE with Embedded Icon..." -ForegroundColor Yellow
-
-$compileArgs = @(
-    "/target:winexe",
-    "/optimize+",
-    "/platform:anycpu",
-    "/win32icon:`"$iconPath`"",
-    "/out:`"$OutputPath`"",
-    "/reference:System.Windows.Forms.dll",
-    "/reference:System.Drawing.dll",
-    "`"$tempCsPath`""
-)
-
-& $cscPath $compileArgs
-
-if (Test-Path $OutputPath) {
-    Remove-Item $tempCsPath -Force -ErrorAction SilentlyContinue
-    Remove-Item $iconPath -Force -ErrorAction SilentlyContinue
-    Write-Host ""
-    Write-Host "==========================================================" -ForegroundColor Green
-    Write-Host "   SUCCESS! STANDALONE VISUAL GUI .EXE GENERATED!         " -ForegroundColor Green
-    Write-Host "==========================================================" -ForegroundColor Green
-    Write-Host "File: $OutputPath" -ForegroundColor Cyan
-    Write-Host "Icon: Embedded custom 'FN' Cyberpunk Logo" -ForegroundColor Green
-    Write-Host "UI:   Full Dark Cyberpunk GUI Window with WASD Cards & Log" -ForegroundColor Green
-    Write-Host ">>> Double-click FN_RocketLeague_MasterEngine.exe now! <<<" -ForegroundColor Yellow
-} else {
-    Write-Host "[ERROR] Compilation failed." -ForegroundColor Red
 }
