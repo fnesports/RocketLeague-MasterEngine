@@ -18,13 +18,13 @@ app.use(express.json({ limit: '10mb' }));
 const apiKey = process.env.GEMINI_API_KEY || '';
 const ai = apiKey
   ? new GoogleGenAI({
-      apiKey,
-      httpOptions: {
-        headers: {
-          'User-Agent': 'aistudio-build',
-        },
+    apiKey,
+    httpOptions: {
+      headers: {
+        'User-Agent': 'aistudio-build',
       },
-    })
+    },
+  })
   : null;
 
 // Coach System Instruction
@@ -40,7 +40,7 @@ You specialize in:
 Be precise, highly technical, encouraging, and provide concrete millisecond/tick timing advice, binding recommendations, and common failure diagnostics. Use markdown formatting with clear headings and bullet points.`;
 
 // Expert Rule-Based Fallback Mechanics Engine (RLCS Tier)
-function generateExpertCoachAdvice(prompt: string, context?: any): string {
+function generateExpertCoachAdvice(prompt: string, _context?: any): string {
   const q = prompt.toLowerCase();
 
   if (q.includes('speedflip') || q.includes('kickoff') || q.includes('flip cancel')) {
@@ -220,7 +220,7 @@ app.post('/api/gemini/tts', async (req, res) => {
 });
 
 // Health check endpoint
-app.get('/api/health', (req, res) => {
+app.get('/api/health', (_req, res) => {
   res.json({
     status: 'online',
     version: '4.0.2',
@@ -229,7 +229,7 @@ app.get('/api/health', (req, res) => {
 });
 
 // Windows PowerShell Deadzone Tuner endpoint
-app.get('/api/scripts/deadzone', (req, res) => {
+app.get('/api/scripts/deadzone', (_req, res) => {
   res.setHeader('Content-Type', 'text/plain; charset=utf-8');
   res.send(`param(
     [double]$InternalDeadzone = 0.05,
@@ -364,7 +364,7 @@ do {
 });
 
 // Windows PowerShell Installer endpoint
-app.get('/api/installer', (req, res) => {
+app.get('/api/installer', (_req, res) => {
   res.setHeader('Content-Type', 'text/plain; charset=utf-8');
   res.send(`# Rocket League Master Engine Installer
 Write-Host "Rocket League Master Engine installer endpoint active."
@@ -382,7 +382,7 @@ async function startServer() {
     app.use(vite.middlewares);
   } else {
     app.use(express.static(path.resolve(__dirname, 'dist')));
-    app.get('*', (req, res) => {
+    app.get('*', (_req, res) => {
       res.sendFile(path.resolve(__dirname, 'dist', 'index.html'));
     });
   }

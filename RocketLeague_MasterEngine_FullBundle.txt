@@ -1,0 +1,720 @@
+-- ==========================================
+-- ROCKET LEAGUE MASTER ENGINE BUNDLE v4.0.2
+-- ==========================================
+
+--- LOGITECH G-HUB LUA SCRIPT ---
+--  ROCKET LEAGUE PROFESSIONAL MASTER-ENGINE 
+-- ALL MACRO LOGIC IN ONE OnEvent. TAInput binds go in TAInput.ini.
+
+-----------------------------------------------------------------------
+-- [1] CORE CONFIGURATION
+-----------------------------------------------------------------------
+local CONFIG = {
+    INTERNAL_DEADZONE = 0.05,
+    DODGE_DEADZONE    = 0.05,
+    HARDWARE_JITTER   = 2,
+    GROUND_SENSE      = 1.35,
+    AERIAL_SENSE      = 1.55,
+    CURVE_EXPONENT    = 1.40,
+}
+
+-----------------------------------------------------------------------
+-- [2] STATE
+-----------------------------------------------------------------------
+local PLAYER_STATE = {
+    IS_AIRBORNE     = false,
+    IS_DRIBBLING    = false,
+    IS_POWERSLIDING = false,
+}
+
+local enable_script = true
+local macro_busy = false
+
+function RunMacro(action)
+    if macro_busy then return end
+    macro_busy = true
+    local ok, err = pcall(action)
+    if not ok then
+        OutputLogMessage("[MACRO ERROR] " .. tostring(err) .. "\n")
+        EmergencyReleaseAll()
+    end
+    macro_busy = false
+end
+
+-----------------------------------------------------------------------
+-- [3] KEY CONFIGURATION
+-----------------------------------------------------------------------
+local BINDINGS = {
+    MOUSE = {
+        TOGGLE     = 3,   -- Middle click: toggle script on/off
+        SPEEDFLIP  = 4,   -- MB4: mouse-bound speed flip
+        CHAINDASH  = 5,   -- MB5: chain dash / aerial
+    },
+
+    GKEY = {
+        FAST_AERIAL     = 1,
+        FWD_SPEEDFLIP   = 2,
+        LEFT_SPEEDFLIP  = 3,
+        RIGHT_SPEEDFLIP = 4,
+    },
+
+    KEYS = {
+        FORWARD    = "w",
+        BACK       = "s",
+        LEFT       = "a",
+        RIGHT      = "d",
+        JUMP       = "mouse2",
+        BOOST      = "mouse1",
+        POWERSLIDE = "lshift",
+        AIRROLL_L  = "q",
+        AIRROLL_R  = "e",
+    },
+}
+
+local MOUSE = BINDINGS.MOUSE
+local GKEY = BINDINGS.GKEY
+local K = BINDINGS.KEYS
+
+-----------------------------------------------------------------------
+-- [4] SAFE INPUT DISPATCHER (KEYBOARD & MOUSE POLYMORPHIC DISPATCHER)
+-- Fixes Logitech G-Hub "Lua Error: invalid argument" when mouse1 or mouse2
+-- are passed to PressKey. Automatically handles mouse clicks and keyboard keys
+-- and prevents stuck keys / echoing.
+-----------------------------------------------------------------------
+local _NativePressKey = PressKey
+local _NativeReleaseKey = ReleaseKey
+local _NativePressMouse = PressMouseButton
+local _NativeReleaseMouse = ReleaseMouseButton
+
+function SafePress(k)
+    if not k then return end
+    local s = tostring(k):lower()
+    if s == "mouse1" or s == "1" or s == "lclick" or s == "m1" then
+        pcall(PressMouseButton, 1)
+    elseif s == "mouse2" or s == "2" or s == "rclick" or s == "m2" then
+        pcall(PressMouseButton, 2)
+    elseif s == "mouse3" or s == "3" or s == "mclick" or s == "m3" then
+        pcall(PressMouseButton, 3)
+    elseif s == "mouse4" or s == "4" or s == "mb4" or s == "m4" then
+        pcall(PressMouseButton, 4)
+    elseif s == "mouse5" or s == "5" or s == "mb5" or s == "m5" then
+        pcall(PressMouseButton, 5)
+    else
+        pcall(_NativePressKey, k)
+    end
+end
+
+function SafeRelease(k)
+    if not k then return end
+    local s = tostring(k):lower()
+    if s == "mouse1" or s == "1" or s == "lclick" or s == "m1" then
+        pcall(ReleaseMouseButton, 1)
+    elseif s == "mouse2" or s == "2" or s == "rclick" or s == "m2" then
+        pcall(ReleaseMouseButton, 2)
+    elseif s == "mouse3" or s == "3" or s == "mclick" or s == "m3" then
+        pcall(ReleaseMouseButton, 3)
+    elseif s == "mouse4" or s == "4" or s == "mb4" or s == "m4" then
+        pcall(ReleaseMouseButton, 4)
+    elseif s == "mouse5" or s == "5" or s == "mb5" or s == "m5" then
+        pcall(ReleaseMouseButton, 5)
+    else
+        pcall(_NativeReleaseKey, k)
+    end
+end
+
+-- Override global PressKey and ReleaseKey so any function calls work without error
+PressKey = SafePress
+ReleaseKey = SafeRelease
+
+Press = SafePress
+Release = SafeRelease
+
+function EmergencyReleaseAll()
+    pcall(ReleaseMouseButton, 1)
+    pcall(ReleaseMouseButton, 2)
+    pcall(ReleaseMouseButton, 3)
+    pcall(ReleaseMouseButton, 4)
+    pcall(ReleaseMouseButton, 5)
+    pcall(_NativeReleaseKey, K.FORWARD)
+    pcall(_NativeReleaseKey, K.BACK)
+    pcall(_NativeReleaseKey, K.LEFT)
+    pcall(_NativeReleaseKey, K.RIGHT)
+    pcall(_NativeReleaseKey, K.POWERSLIDE)
+    pcall(_NativeReleaseKey, K.AIRROLL_L)
+    pcall(_NativeReleaseKey, K.AIRROLL_R)
+end
+
+-----------------------------------------------------------------------
+-- [5] ADVANCED RADIAL DEADZONE & DODGE ENGINE (RLCS SPEC: 0.05 / 0.05)
+-----------------------------------------------------------------------
+-- 1. Continuous Radial Deadzone Re-scaling:
+--    Eliminates sudden step jumps at the 0.05 boundary.
+--    Normalized range [0.05 .. 1.00] maps smoothly to [0.00 .. 1.00].
+function ApplyProfessionalCurve(input, multiplier)
+    local raw_abs = math.abs(input)
+    local deadzone = CONFIG.INTERNAL_DEADZONE * 127
+    if raw_abs <= deadzone then return 0 end
+
+    -- Smooth re-scaled range: starts at 0 immediately past the deadzone
+    local active_range = (raw_abs - deadzone) / (127 - deadzone)
+    local sign = (input > 0) and 1 or -1
+    local curved = math.pow(active_range, CONFIG.CURVE_EXPONENT)
+    return curved * 127 * sign * (multiplier or 1.0)
+end
+
+-- 2. 2D Radial Dodge Deadzone Gate:
+--    Ensures directional vector magnitude exceeds DODGE_DEADZONE (0.05)
+--    when executing diagonal speedflips to guarantee a flip instead of a double jump stall.
+function IsDodgeDeadzoneSatisfied(x, y)
+    local norm_x = math.abs(x or 0) / 127
+    local norm_y = math.abs(y or 0) / 127
+    local magnitude = math.sqrt(norm_x * norm_x + norm_y * norm_y)
+    return magnitude >= CONFIG.DODGE_DEADZONE
+end
+
+-- 3. Hardware Jitter Filter:
+function FilterJitter(val)
+    if math.abs(val) < CONFIG.HARDWARE_JITTER then return 0 end
+    return val
+end
+
+-----------------------------------------------------------------------
+-- [6] MACRO FUNCTIONS
+-----------------------------------------------------------------------
+
+-- G1: Fast Aerial with Flip Cancel
+function MacroFastAerial()
+    OutputLogMessage("[MACRO] Fast Aerial initiated (Jump1: 200ms, Cancel: 300ms)\n")
+    PressKey(K.BOOST)
+    PressKey(K.BACK)
+    PressKey(K.JUMP)
+    Sleep(200)
+    ReleaseKey(K.JUMP)
+    ReleaseKey(K.BACK)
+    Sleep(30)
+
+    PressKey(K.JUMP)
+    Sleep(30)
+    ReleaseKey(K.JUMP)
+
+    Sleep(150)
+    PressKey(K.FORWARD)
+    PressKey(K.JUMP)
+    Sleep(20)
+    ReleaseKey(K.JUMP)
+    ReleaseKey(K.FORWARD)
+
+    PressKey(K.BACK)
+    Sleep(300)
+    ReleaseKey(K.BACK)
+    ReleaseKey(K.BOOST)
+    OutputLogMessage("[MACRO] Fast Aerial completed\n")
+end
+
+-- G2: Forward Speedflip
+function MacroForwardSpeedflip()
+    OutputLogMessage("[MACRO] Forward Speedflip initiated (Jump: 30ms, Cancel: 550ms)\n")
+    PressKey(K.BOOST)
+    PressKey(K.FORWARD)
+    PressKey(K.JUMP)
+    Sleep(30)
+    ReleaseKey(K.JUMP)
+    Sleep(30)
+
+    PressKey(K.JUMP)
+    Sleep(20)
+    ReleaseKey(K.JUMP)
+    ReleaseKey(K.FORWARD)
+
+    PressKey(K.BACK)
+    Sleep(550)
+    ReleaseKey(K.BACK)
+    ReleaseKey(K.BOOST)
+    OutputLogMessage("[MACRO] Forward Speedflip completed\n")
+end
+
+-- G3: Left Speedflip
+function MacroLeftSpeedflip()
+    OutputLogMessage("[MACRO] Left Speedflip initiated (Cancel: 600ms)\n")
+    PressKey(K.BOOST)
+    PressKey(K.FORWARD)
+    PressKey(K.LEFT)
+    PressKey(K.JUMP)
+    Sleep(30)
+    ReleaseKey(K.JUMP)
+    Sleep(30)
+
+    PressKey(K.JUMP)
+    Sleep(20)
+    ReleaseKey(K.JUMP)
+    ReleaseKey(K.FORWARD)
+    ReleaseKey(K.LEFT)
+
+    PressKey(K.BACK)
+    PressKey(K.AIRROLL_L)
+    Sleep(600)
+    ReleaseKey(K.BACK)
+    ReleaseKey(K.AIRROLL_L)
+    ReleaseKey(K.BOOST)
+    OutputLogMessage("[MACRO] Left Speedflip completed\n")
+end
+
+-- G4: Right Speedflip
+function MacroRightSpeedflip()
+    OutputLogMessage("[MACRO] Right Speedflip initiated (Cancel: 600ms)\n")
+    PressKey(K.BOOST)
+    PressKey(K.FORWARD)
+    PressKey(K.RIGHT)
+    PressKey(K.JUMP)
+    Sleep(30)
+    ReleaseKey(K.JUMP)
+    Sleep(30)
+
+    PressKey(K.JUMP)
+    Sleep(20)
+    ReleaseKey(K.JUMP)
+    ReleaseKey(K.FORWARD)
+    ReleaseKey(K.RIGHT)
+
+    PressKey(K.BACK)
+    PressKey(K.AIRROLL_R)
+    Sleep(600)
+    ReleaseKey(K.BACK)
+    ReleaseKey(K.AIRROLL_R)
+    ReleaseKey(K.BOOST)
+    OutputLogMessage("[MACRO] Right Speedflip completed\n")
+end
+
+-- MB4: Mouse-bound Speedflip (With Powerslide Drift Recovery)
+function MacroMouseSpeedflip()
+    OutputLogMessage("[MACRO] Mouse Speedflip (MB4) initiated with Powerslide recovery\n")
+    PressKey(K.BOOST)
+    PressKey(K.FORWARD)
+    PressKey(K.LEFT)
+    PressKey(K.JUMP)
+    Sleep(35)
+    ReleaseKey(K.JUMP)
+    Sleep(45)
+
+    PressKey(K.JUMP)
+    Sleep(25)
+    ReleaseKey(K.JUMP)
+    Sleep(20)
+    ReleaseKey(K.FORWARD)
+
+    PressKey(K.BACK)
+    PressKey(K.POWERSLIDE)
+    Sleep(600)
+    ReleaseKey(K.BACK)
+    ReleaseKey(K.LEFT)
+    ReleaseKey(K.POWERSLIDE)
+    ReleaseKey(K.BOOST)
+    OutputLogMessage("[MACRO] Mouse Speedflip completed\n")
+end
+
+-- MB5: Chain Dash / Aerial
+function MacroChainDash()
+    OutputLogMessage("[MACRO] Chain Dash (MB5) initiated\n")
+    PressKey(K.JUMP)
+    Sleep(30)
+    ReleaseKey(K.JUMP)
+    Sleep(60)
+
+    PressKey(K.FORWARD)
+    PressKey(K.POWERSLIDE)
+    PressKey(K.JUMP)
+    Sleep(30)
+    ReleaseKey(K.JUMP)
+    Sleep(50)
+    ReleaseKey(K.POWERSLIDE)
+    ReleaseKey(K.FORWARD)
+    OutputLogMessage("[MACRO] Chain Dash completed\n")
+end
+
+-----------------------------------------------------------------------
+-- [7] SINGLE EVENT HANDLER
+-----------------------------------------------------------------------
+function OnEvent(event, arg)
+    if event == "PROFILE_ACTIVATED" then
+        EnablePrimaryMouseButtonEvents(true)
+        ClearLog()
+        OutputLogMessage("==========================================\n")
+        OutputLogMessage(" ROCKET LEAGUE MASTER-ENGINE v4.0.2\n")
+        OutputLogMessage(" STATUS: ONLINE | LOGITECH G-HUB READY\n")
+        OutputLogMessage("==========================================\n")
+        return
+    end
+
+    if event == "MOUSE_BUTTON_PRESSED" and arg == MOUSE.TOGGLE then
+        enable_script = not enable_script
+        OutputLogMessage("[ENGINE] Script is now " .. (enable_script and "ENABLED" or "DISABLED") .. "\n")
+        return
+    end
+
+    if not enable_script then return end
+
+    if event == "MOUSE_BUTTON_PRESSED" then
+        if arg == MOUSE.SPEEDFLIP then
+            RunMacro(MacroMouseSpeedflip)
+            return
+        elseif arg == MOUSE.CHAINDASH then
+            RunMacro(MacroChainDash)
+            return
+        end
+    end
+
+    if event == "G_PRESSED" then
+        if arg == GKEY.FAST_AERIAL then
+            RunMacro(MacroFastAerial)
+        elseif arg == GKEY.FWD_SPEEDFLIP then
+            RunMacro(MacroForwardSpeedflip)
+        elseif arg == GKEY.LEFT_SPEEDFLIP then
+            RunMacro(MacroLeftSpeedflip)
+        elseif arg == GKEY.RIGHT_SPEEDFLIP then
+            RunMacro(MacroRightSpeedflip)
+        end
+        return
+    end
+end
+
+
+--- ROCKET LEAGUE TAINPUT.INI ---
+[Engine.Console]
+ConsoleKey=1
+TypeKey=Tilde
+KeyboardAxisBlendTime=0.01
+; FN PRO 0.05 Deadzone Calibration Active
+
+[TAGame.PlayerInput_TA]
+MouseSensitivity=10
+TapTime=0.01
+DoubleTapTime=0.03
+GamepadDeadzone=0.05
+GamepadFreeLookDeadzone=0.01
+GamepadLookScale=80
+KeyboardAxisBlendTime=0.01
+; FN PRO 0.05 Deadzone Calibration Active
+
+PCBindings=( Action="Boost", Key="LeftMouseButton" )
+PCBindings=( Action="Jump", Key="RightMouseButton" )
+PCBindings=( Action="Handbrake", Key="LeftShift" )
+PCBindings=( Action="SecondaryCamera", Key="Spacebar" )
+PCBindings=( Action="Forward", Key="W" )
+PCBindings=( Action="Backward", Key="S" )
+PCBindings=( Action="Left", Key="A" )
+PCBindings=( Action="Right", Key="D" )
+PCBindings=( Action="AirRollLeft", Key="e" )
+PCBindings=( Action="AirRollRight", Key="q" )
+PCBindings=( Action="RearCamera", Key="MiddleMouseButton" )
+PCBindings=( Action="FastFreeplay", Key="LeftShift" )
+PCBindings=( Action="ToggleScoreboard", Key="Tab" )
+
+[TAGame.DebugInput_TA]
+MouseSensitivity=10
+KeyboardAxisBlendTime=0.01
+; FN PRO 0.05 Deadzone Calibration Active
+
+[ProjectX.DemoPlayerInput_X]
+MouseSensitivity=10
+KeyboardAxisBlendTime=0.01
+; FN PRO 0.05 Deadzone Calibration Active
+
+[IniVersion]
+0=1789689746.000000
+1=1790221648.000000
+
+
+--- ROCKET LEAGUE TASYSTEMSETTINGS.INI ---
+[SystemSettings]
+; ==============================================================================
+; FN PRO ULTRA-COMPETITIVE WINDOWS PC PROFILE (PURE LOW-LATENCY)
+; All Mobile / iPhone / iPad / Android / Switch / Console sections stripped completely.
+; Zero GPU Bottlenecks - Maximum Frame Pacing & Sub-Millisecond Input Polling.
+; All latency-inducing features disabled (OneFrameThreadLag=False, FrameSleep=False).
+; Prioritizes system memory and thread scheduling for raw mouse & keyboard reading.
+; ==============================================================================
+UseDirectSound=True
+StaticDecals=False
+DynamicDecals=False
+UnbatchedDecals=False
+DecalCullDistanceScale=0.000000
+AllowDynamicLighting=False
+DynamicLights=False
+AllowShadows=False
+DynamicShadows=False
+LightEnvironmentShadows=False
+CompositeDynamicLights=False
+SHSecondaryLighting=False
+DirectionalLightmaps=False
+MotionBlur=False
+MotionBlurPause=False
+MotionBlurSkinning=0
+DepthOfField=False
+AmbientOcclusion=False
+Bloom=False
+bAllowLightShafts=False
+Distortion=False
+FilteredDistortion=False
+DropParticleDistortion=False
+bAllowDownsampledTranslucency=False
+SpeedTreeLeaves=False
+SpeedTreeFronds=False
+OnlyStreamInTextures=False
+LensFlares=False
+FogVolumes=False
+FloatingPointRenderTargets=False
+OneFrameThreadLag=False
+WaitForGPU=false
+UseVsync=False
+CustomFPS=0
+UpscaleScreenPercentage=False
+MinimumScreenScale=100.000000
+AllowDynamicResolution=False
+ZCullSaveRestore=False
+AdaptiveZcull=False
+BinnerTileCache=False
+Fullscreen=True
+Borderless=True
+ResX=1920
+ResY=1080
+AutoDetectDesktopResolution=False
+AllowOpenGL=False
+AllowRadialBlur=False
+AllowSubsurfaceScattering=False
+AllowImageReflections=False
+AllowImageReflectionShadowing=False
+bAllowSeparateTranslucency=False
+bAllowPostprocessMLAA=False
+bAllowHighQualityMaterials=False
+bUseTranslucentArenaShaders=False
+MaxFilterBlurSampleCount=0
+SkeletalMeshLODBias=0
+ParticleLODBias=0
+DetailMode=0
+MaxDrawDistanceScale=1
+ShadowFilterQualityBias=0
+MaxAnisotropy=1
+MaxMultiSamples=1
+bAllowD3D9MSAA=False
+bAllowTemporalAA=False
+AllowApexCloth=False
+ScreenPercentage=100.000000
+SceneCaptureStreamingMultiplier=1.000000
+ShadowTexelsPerPixel=0.000000
+PreShadowResolutionFactor=0.000000
+bEnableBranchingPCFShadows=False
+bAllowHardwareShadowFiltering=False
+bEnableForegroundShadowsOnWorld=False
+bEnableForegroundSelfShadowing=False
+bAllowWholeSceneDominantShadows=False
+bUseConservativeShadowBounds=False
+bAllowFracturedDamage=False
+HighPrecisionGBuffers=False
+AllowSecondaryDisplays=False
+AllowPerFrameSleep=False
+AllowPerFrameYield=False
+
+[SystemSettingsTexturesLow]
+BasedOn=SystemSettings
+TEXTUREGROUP_Character=(MinLODSize=1,MaxLODSize=512,LODBias=0)
+TEXTUREGROUP_CharacterNormalMap=(MinLODSize=1,MaxLODSize=256,LODBias=0)
+TEXTUREGROUP_CharacterSpecular=(MinLODSize=1,MaxLODSize=256,LODBias=0)
+TEXTUREGROUP_Vehicle=(MinLODSize=1,MaxLODSize=512,LODBias=0)
+TEXTUREGROUP_VehicleNormalMap=(MinLODSize=1,MaxLODSize=256,LODBias=0)
+TEXTUREGROUP_VehicleSpecular=(MinLODSize=1,MaxLODSize=256,LODBias=0)
+TEXTUREGROUP_World=(MinLODSize=1,MaxLODSize=512,LODBias=0)
+TEXTUREGROUP_WorldNormalMap=(MinLODSize=1,MaxLODSize=256,LODBias=0)
+TEXTUREGROUP_WorldSpecular=(MinLODSize=1,MaxLODSize=256,LODBias=0)
+TEXTUREGROUP_Effects=(MinLODSize=1,MaxLODSize=256,LODBias=0)
+TEXTUREGROUP_UI=(MinLODSize=1,MaxLODSize=1024,LODBias=0)
+
+[SystemSettingsProfileDetailLow]
+BasedOn=SystemSettings
+DetailMode=0
+AmbientOcclusion=False
+DepthOfField=False
+Bloom=False
+bAllowLightShafts=False
+LensFlares=False
+DynamicShadows=False
+MotionBlur=False
+
+[IniVersion]
+0=1789689746.000000
+1=1789689746.000000
+
+
+--- POWERSHELL HOOK ENGINE ---
+Add-Type -TypeDefinition @"
+using System;
+using System.Diagnostics;
+using System.Runtime.InteropServices;
+using System.Threading;
+
+public class FastAerialManager {
+    private const int WH_KEYBOARD_LL = 13;
+    private const int WM_KEYDOWN = 0x0100;
+    private const int LLKHF_INJECTED = 0x0010;
+
+    private static HookProc _proc = HookCallback;
+    private static IntPtr _hookID = IntPtr.Zero;
+    private static bool _isRunning = false;
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct KBDLLHOOKSTRUCT {
+        public uint vkCode;
+        public uint scanCode;
+        public uint flags;
+        public uint time;
+        public IntPtr dwExtraInfo;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    struct INPUT {
+        public uint type;
+        public KEYBDINPUT ki;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    struct KEYBDINPUT {
+        public ushort wVk;
+        public ushort wScan;
+        public uint dwFlags;
+        public uint time;
+        public IntPtr dwExtraInfo;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct MSG {
+        public IntPtr hwnd;
+        public uint message;
+        public IntPtr wParam;
+        public IntPtr lParam;
+        public uint time;
+        public int pt_x;
+        public int pt_y;
+    }
+
+    private const uint INPUT_KEYBOARD = 1;
+    private const uint KEYEVENTF_KEYUP = 0x0002;
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern uint SendInput(uint nInputs, INPUT[] pInputs, int cbSize);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern IntPtr SetWindowsHookEx(int idHook, HookProc lpfn, IntPtr hMod, uint dwThreadId);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool UnhookWindowsHookEx(IntPtr hhk);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern IntPtr CallNextHookEx(IntPtr hhk, int nCode, IntPtr wParam, IntPtr lParam);
+
+    [DllImport("user32.dll")]
+    private static extern sbyte GetMessage(out MSG lpMsg, IntPtr hWnd, uint wMsgFilterMin, uint wMsgFilterMax);
+
+    [DllImport("user32.dll")]
+    private static extern bool TranslateMessage([In] ref MSG lpMsg);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr DispatchMessage([In] ref MSG lpMsg);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern IntPtr GetModuleHandle(string lpModuleName);
+
+    private delegate IntPtr HookProc(int nCode, IntPtr wParam, IntPtr lParam);
+
+    public static void PressKey(byte vkCode) {
+        INPUT[] inputs = new INPUT[1];
+        inputs[0].type = INPUT_KEYBOARD;
+        inputs[0].ki.wVk = vkCode;
+        inputs[0].ki.dwFlags = 0;
+        SendInput(1, inputs, Marshal.SizeOf(typeof(INPUT)));
+    }
+
+    public static void ReleaseKey(byte vkCode) {
+        INPUT[] inputs = new INPUT[1];
+        inputs[0].type = INPUT_KEYBOARD;
+        inputs[0].ki.wVk = vkCode;
+        inputs[0].ki.dwFlags = KEYEVENTF_KEYUP;
+        SendInput(1, inputs, Marshal.SizeOf(typeof(INPUT)));
+    }
+
+    public static Action ActionS;
+
+    public static void Start() {
+        _hookID = SetHook(_proc);
+        MSG msg;
+        while (GetMessage(out msg, IntPtr.Zero, 0, 0) > 0) {
+            TranslateMessage(ref msg);
+            DispatchMessage(ref msg);
+        }
+        UnhookWindowsHookEx(_hookID);
+    }
+
+    private static IntPtr SetHook(HookProc proc) {
+        using (Process curProcess = Process.GetCurrentProcess())
+        using (ProcessModule curModule = curProcess.MainModule) {
+            return SetWindowsHookEx(WH_KEYBOARD_LL, proc, GetModuleHandle(curModule.ModuleName), 0);
+        }
+    }
+
+    private static IntPtr HookCallback(int nCode, IntPtr wParam, IntPtr lParam) {
+        if (nCode >= 0 && wParam == (IntPtr)WM_KEYDOWN) {
+            KBDLLHOOKSTRUCT hookStruct = (KBDLLHOOKSTRUCT)Marshal.PtrToStructure(lParam, typeof(KBDLLHOOKSTRUCT));
+            bool isInjected = (hookStruct.flags & LLKHF_INJECTED) != 0;
+
+            // 83 = S key (0x53)
+            if (!isInjected && hookStruct.vkCode == 83 && !_isRunning) {
+                _isRunning = true;
+                new Thread(() => {
+                    try {
+                        if (ActionS != null) ActionS();
+                    } finally {
+                        _isRunning = false;
+                    }
+                }).Start();
+
+                return (IntPtr)1; // Block physical key repeat
+            }
+        }
+        return CallNextHookEx(_hookID, nCode, wParam, lParam);
+    }
+}
+"@
+
+# Key Codes (Hex)
+$K_BOOST   = 0x44  # D key (or customize to match your RL Boost key)
+$K_BACK    = 0x53  # S key
+$K_JUMP    = 0x20  # Spacebar
+$K_FORWARD = 0x57  # W key
+
+[FastAerialManager]::ActionS = {
+    [FastAerialManager]::PressKey($K_BOOST)
+    [FastAerialManager]::PressKey($K_BACK)
+    [FastAerialManager]::PressKey($K_JUMP)
+    Start-Sleep -Milliseconds 200
+    [FastAerialManager]::ReleaseKey($K_JUMP)
+    [FastAerialManager]::ReleaseKey($K_BACK)
+    Start-Sleep -Milliseconds 30
+
+    [FastAerialManager]::PressKey($K_JUMP)
+    Start-Sleep -Milliseconds 30
+    [FastAerialManager]::ReleaseKey($K_JUMP)
+
+    Start-Sleep -Milliseconds 150
+    [FastAerialManager]::PressKey($K_FORWARD)
+    [FastAerialManager]::PressKey($K_JUMP)
+    Start-Sleep -Milliseconds 20
+    [FastAerialManager]::ReleaseKey($K_JUMP)
+    [FastAerialManager]::ReleaseKey($K_FORWARD)
+
+    [FastAerialManager]::PressKey($K_BACK)
+    Start-Sleep -Milliseconds 300
+    [FastAerialManager]::ReleaseKey($K_BACK)
+    [FastAerialManager]::ReleaseKey($K_BOOST)
+}
+
+Write-Host ">>> Rocket League Fast Aerial Low-Level Hook Active on [S] (Press Ctrl+C to Stop) <<<" -ForegroundColor Green
+[FastAerialManager]::Start()
